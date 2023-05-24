@@ -1,13 +1,19 @@
 package com.mybank.tui;
 
+import com.mybank.batch.AccumulateSavingsBatch;
+import com.mybank.data.DataSource;
+import com.mybank.domain.Account;
 import com.mybank.domain.Bank;
 import com.mybank.domain.CheckingAccount;
 import com.mybank.domain.Customer;
-import com.mybank.domain.SavingsAccount;
+import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URLDecoder;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.mybank.reporting.CustomerReport;
 import org.jline.reader.*;
 import org.jline.reader.impl.completer.*;
 import org.jline.utils.*;
@@ -25,6 +31,8 @@ import org.fusesource.jansi.*;
  * @author Alexander 'Taurus' Babich
  */
 public class CLIdemo {
+    private static final CustomerReport customerReport = new CustomerReport();
+    private static DataSource dataSource;
 
     public static final String ANSI_RESET = "\u001B[0m";
     public static final String ANSI_BLACK = "\u001B[30m";
@@ -39,10 +47,11 @@ public class CLIdemo {
     private String[] commandsList;
 
     public void init() {
-        commandsList = new String[]{"help", "customers", "customer", "exit"};
+        commandsList = new String[]{"help", "customers", "customer", "accountInfo", "deposit" , "withdraw" ,
+                "report", "save" ,"exit"};
     }
 
-    public void run() {
+    public void run() throws IOException {
         AnsiConsole.systemInstall(); // needed to support ansi on Windows cmd
         printWelcomeMessage();
         LineReaderBuilder readerBuilder = LineReaderBuilder.builder();
@@ -76,6 +85,93 @@ public class CLIdemo {
                     System.out.println(ANSI_RED+"Your bank has no customers!"+ANSI_RESET);
                 }
 
+            } else if (line.indexOf("withdraw") != -1) {
+                try {
+                    int custNo = 0,SumNum = 0,accNum = 0;
+                    if (line.length() > 8) {
+                        String strCustomerNum = line.split(" ")[1];
+                        String strSumNum = line.split(" ")[3];
+                        String strAccountNum = line.split(" ")[2];
+                        if (strCustomerNum != null && strSumNum != null & strAccountNum != null) {
+                            custNo = Integer.parseInt(strCustomerNum);
+                            SumNum = Integer.parseInt(strSumNum);
+                            accNum = Integer.parseInt(strAccountNum);
+                        }
+                    }
+                    Account cust = Bank.getCustomer(custNo).getAccount(accNum);
+                    String accType = cust instanceof CheckingAccount ? "Checking" : "Savings";
+
+                    if (SumNum>0){
+                        cust.withdraw(SumNum);
+                    }
+                    else {
+                        SumNum = 0;
+                    }
+
+                    System.out.println("Removed "+SumNum+"$!");
+                    System.out.println("\nAccount ID\tAccount Type\tBalance");
+                    System.out.println("---------------------------------------");
+                    System.out.println("\t"+accNum + "\t\t" + accType + "\t\t$" + cust.getBalance());
+                } catch (Exception e) {
+                    System.out.println(ANSI_RED + "ERROR! Wrong customer number!" + ANSI_RESET);
+                }
+            } else if (line.indexOf("deposit") != -1) {
+                try {
+                    int custNo = 0,SumNum = 0,accNum = 0;
+                    if (line.length() > 8) {
+                        String strCustomerNum = line.split(" ")[1];
+                        String strSumNum = line.split(" ")[3];
+                        String strAccountNum = line.split(" ")[2];
+                        if (strCustomerNum != null && strSumNum != null & strAccountNum != null) {
+                            custNo = Integer.parseInt(strCustomerNum);
+                            SumNum = Integer.parseInt(strSumNum);
+                            accNum = Integer.parseInt(strAccountNum);
+                        }
+                    }
+                    Account cust = Bank.getCustomer(custNo).getAccount(accNum);
+                    String accType = cust instanceof CheckingAccount ? "Checking" : "Savings";
+
+                    if (SumNum>0){
+                        cust.deposit(SumNum);
+                    }
+                    else {
+                        SumNum = 0;
+                    }
+
+                    System.out.println("Added "+SumNum+"$!");
+                    System.out.println("\nAccount ID\tAccount Type\tBalance");
+                    System.out.println("---------------------------------------");
+                    System.out.println("\t"+accNum + "\t\t" + accType + "\t\t$" + cust.getBalance());
+                } catch (Exception e) {
+                    System.out.println(ANSI_RED + "ERROR! Wrong customer number!" + ANSI_RESET);
+                }
+            } else if (line.indexOf("accountInfo") != -1) {
+                try {
+                    int custNo = 0,accNum = 0;
+                    if (line.length() > 8) {
+                        String strCustomerNum = line.split(" ")[1];
+                        String strAccountNum = line.split(" ")[2];
+                        if (strCustomerNum != null && strAccountNum != null) {
+                            custNo = Integer.parseInt(strCustomerNum);
+                            accNum = Integer.parseInt(strAccountNum);
+                        }
+                    }
+                    Account cust = Bank.getCustomer(custNo).getAccount(accNum);
+                    String accType = cust instanceof CheckingAccount ? "Checking" : "Savings";
+
+                    AttributedStringBuilder a = new AttributedStringBuilder()
+                            .append("\nThis is detailed information about customer account #")
+                            .append(Integer.toString(custNo), AttributedStyle.BOLD.foreground(AttributedStyle.RED))
+                            .append("!");
+
+                    System.out.println(a.toAnsi());
+
+                    System.out.println("\nAccount ID\tAccount Type\tBalance");
+                    System.out.println("---------------------------------------");
+                    System.out.println("\t"+accNum + "\t\t" + accType + "\t\t$" + cust.getBalance());
+                } catch (Exception e) {
+                    System.out.println(ANSI_RED + "ERROR! Wrong customer number!" + ANSI_RESET);
+                }
             } else if (line.indexOf("customer") != -1) {
                 try {
                     int custNo = 0;
@@ -97,7 +193,7 @@ public class CLIdemo {
                     
                     System.out.println("\nLast name\tFirst Name\tAccount Type\tBalance");
                     System.out.println("-------------------------------------------------------");
-                    System.out.println(cust.getLastName() + "\t\t" + cust.getFirstName() + "\t\t" + accType + "\t$" + cust.getAccount(0).getBalance());
+                    System.out.println(cust.getLastName() + "\t\t" + cust.getFirstName() + "\t\t" + accType + "\t\t$" + cust.getAccount(0).getBalance());
                 } catch (Exception e) {
                     System.out
                         .println(ANSI_RED + "ERROR! Wrong customer number!" + ANSI_RESET);
@@ -105,9 +201,13 @@ public class CLIdemo {
             } else if ("exit".equals(line)) {
                 System.out.println("Exiting application");
                 return;
+            } else if ("report".equals(line)) {
+                customerReport.generateReport();
+            } else if ("save".equals(line)) {
+                System.out.println("Data is saved!");
+
             } else {
-                System.out
-                        .println(ANSI_RED + "Invalid command, For assistance press TAB or type \"help\" then hit ENTER." + ANSI_RESET);
+                System.out.println(ANSI_RED + "Invalid command, For assistance press TAB or type \"help\" then hit ENTER." + ANSI_RESET);
             }
         }
 
@@ -124,6 +224,10 @@ public class CLIdemo {
         System.out.println("help\t\t\t- Show help");
         System.out.println("customer\t\t- Show list of customers");
         System.out.println("customer \'index\'\t- Show customer details");
+        System.out.println("accountInfo \'index of customer\' \'index of account\'\t- Show customer account details");
+        System.out.println("deposit \'index of customer\' \'index of account\' \'depositSum\'\t- Deposit");
+        System.out.println("withdraw \'index of customer\' \'index of account\' \'withdrawSum\'\t- Withdraw");
+        System.out.println("report\t\t- Show report");
         System.out.println("exit\t\t\t- Exit the app");
 
     }
@@ -141,13 +245,17 @@ public class CLIdemo {
         }
     }
 
-    public static void main(String[] args) {
-
-        Bank.addCustomer("John", "Doe");
-        Bank.addCustomer("Fox", "Mulder");
-        Bank.getCustomer(0).addAccount(new CheckingAccount(2000));
-        Bank.getCustomer(1).addAccount(new SavingsAccount(1000, 3));
-
+    public static void main(String[] args) throws IOException {
+        File currentClass = new File(URLDecoder.decode(CLIdemo.class
+                .getProtectionDomain()
+                .getCodeSource()
+                .getLocation()
+                .getPath(), "UTF-8"));
+        String classDirectory = currentClass.getParent();
+        //Loading saved data
+        dataSource = new DataSource(classDirectory+"\\35-tui-2-serhio-sys\\test.dat");
+        dataSource.loadData();
+        //Loading saved data
         CLIdemo shell = new CLIdemo();
         shell.init();
         shell.run();
